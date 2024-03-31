@@ -24,6 +24,7 @@ class first_model():
 
         self.X_train_low_dim = self.PCA_model_x.fit_transform(X_train)
         self.Y_train_low_dim = self.PCA_model_y.fit_transform(Y_train)
+        print(self.X_train_low_dim.shape)
         print(self.Y_train_low_dim.shape)
 
         self.low_dim_regressor.fit(self.X_train_low_dim, self.Y_train_low_dim)
@@ -32,8 +33,10 @@ class first_model():
             # record training results
             self.Y_train_low_dim_pred = self.low_dim_regressor.predict(self.X_train_low_dim)
             print(self.Y_train_low_dim_pred.shape)
-            # self.Y_train_pred = self.PCA_model_y.inverse_transform(self.Y_train_low_dim_pred)
-            # self.train_rmse = np.sqrt(np.mean((Y_train - self.Y_train_pred) ** 2, axis=1))
+            self.Y_train_low_dim_pred = self.Y_train_low_dim_pred.reshape(-1, 1)
+            print(self.Y_train_low_dim_pred.shape)
+            self.Y_train_pred = self.PCA_model_y.inverse_transform(self.Y_train_low_dim_pred)
+            self.train_rmse = np.sqrt(np.mean((Y_train - self.Y_train_pred) ** 2, axis=1))
             
     
     def predict(self, X):
@@ -41,6 +44,7 @@ class first_model():
             raise ValueError("Input dimension mismatch")
         X_low_dim = self.PCA_model_x.transform(X)
         Y_low_dim = self.low_dim_regressor.predict(X_low_dim)
+        Y_low_dim = Y_low_dim.reshape(-1, 1)
         return self.PCA_model_y.inverse_transform(Y_low_dim)
     
     def test(self, X_test, Y_test):
