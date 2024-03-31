@@ -8,7 +8,7 @@ from sklearn.metrics import r2_score
 import gpjax as gpx
 from jax import jit
 
-class first_model:
+class first_model():
     def __init__(self, low_dim_x, low_dim_y = 1, low_dim_regressor = LinearRegression()):
         self.low_dim_x = low_dim_x
         self.low_dim_y = low_dim_y
@@ -24,14 +24,16 @@ class first_model:
 
         self.X_train_low_dim = self.PCA_model_x.fit_transform(X_train)
         self.Y_train_low_dim = self.PCA_model_y.fit_transform(Y_train)
+        print(self.Y_train_low_dim.shape)
 
-        self.low_dim_regressor = self.low_dim_regressor.fit(self.low_dim_regressor, self.X_train_low_dim, self.Y_train_low_dim)
+        self.low_dim_regressor.fit(self.X_train_low_dim, self.Y_train_low_dim)
 
         if save:
             # record training results
             self.Y_train_low_dim_pred = self.low_dim_regressor.predict(self.X_train_low_dim)
-            self.Y_train_pred = self.PCA_model_y.inverse_transform(self.Y_train_low_dim_pred)
-            self.train_rmse = np.sqrt(np.mean((Y_train - self.Y_train_pred) ** 2, axis=1))
+            print(self.Y_train_low_dim_pred.shape)
+            # self.Y_train_pred = self.PCA_model_y.inverse_transform(self.Y_train_low_dim_pred)
+            # self.train_rmse = np.sqrt(np.mean((Y_train - self.Y_train_pred) ** 2, axis=1))
             
     
     def predict(self, X):
@@ -47,12 +49,12 @@ class first_model:
         R2 = r2_score(Y_test.T, Y_test_pred.T, multioutput='raw_values')
         return rmse, R2
     
-class GP_regressor:
+class GP_regressor():
     def __init__(self, kernel = gpx.kernels.RBF(), mean_function = gpx.mean_functions.Zero()):
         self.kernel = kernel
         self.mean_function = mean_function
         self.prior = gpx.gps.Prior(mean_function=self.mean_function, kernel=self.kernel)
-        print(self.prior)
+        return None
     
     def fit(self, X_train, Y_train):
         self.n_samples_train = X_train.shape[0]
@@ -66,12 +68,12 @@ class GP_regressor:
         negative_mll = jit(negative_mll)
         self.opt_posterior, self.history = gpx.fit_scipy(model=posterior, objective=negative_mll, train_data=self.D)
         
-    def sample_prior(self, key, X_test, n_samples = 1):
+    def sample_prior(self, X_test, n_samples):
         prior_dist = self.prior.predict(X_test)
-        print(prior_dist.mean())
-        print(prior_dist.covariance())
-        print(prior_dist)
-        return prior_dist.sample(seed=key, sample_shape=(n_samples,))
+        mean = prior_dist.mean()
+        cov = prior_dist.covariance()
+        samples = np.random.multivariate_normal(mean, cov, n_samples)
+        return mean, cov, samples
     
     def predict(self, X_test):
         if self.n_features != X_test.shape[1]:
@@ -81,4 +83,4 @@ class GP_regressor:
 
         predictive_mean = predictive_dist.mean()
         predictive_std = predictive_dist.stddev()
-        return predictive_mean, predictive_std
+        return predictive_mean
