@@ -9,13 +9,14 @@ import gpjax as gpx
 from jax import jit
 
 class first_model():
-    def __init__(self, low_dim_x, low_dim_y = 1, low_dim_regressor = LinearRegression()):
+    def __init__(self, low_dim_x, low_dim_y = 1, low_dim_regressor = 'linear', GP_params = None):
         self.low_dim_x = low_dim_x
         self.low_dim_y = low_dim_y
         self.PCA_model_x = PCA(n_components=low_dim_x)
         self.PCA_model_y = PCA(n_components=low_dim_y)
 
-        self.low_dim_regressor = low_dim_regressor
+        self.low_dim_regressor_name = low_dim_regressor
+        self.GP_params = GP_params
 
     def fit(self, X_train, Y_train, save = False):
         self.n_samples_train = X_train.shape[0]
@@ -27,25 +28,39 @@ class first_model():
         print(self.X_train_low_dim.shape)
         print(self.Y_train_low_dim.shape)
 
-        self.low_dim_regressor.fit(self.X_train_low_dim, self.Y_train_low_dim)
+        print(self.low_dim_regressor_name)
+
+        if self.low_dim_regressor_name == 'linear':
+            self.low_dim_regressor_list = [LinearRegression() for i in range(self.low_dim_y)]
+        elif self.low_dim_regressor_name == 'GP':
+            self.low_dim_regressor_list = [GP_regressor(self.GP_params) for i in range(self.low_dim_y)]
+        else:
+            raise ValueError("Invalid regressor type. Must be 'linear' or 'GP'")
+        
+        print(self.Y_train_low_dim.shape)
+        for i, regressor in enumerate(self.low_dim_regressor_list):
+            regressor.fit(self.X_train_low_dim, self.Y_train_low_dim[:, i])
+
 
         if save:
             # record training results
-            self.Y_train_low_dim_pred = self.low_dim_regressor.predict(self.X_train_low_dim)
-            print(self.Y_train_low_dim_pred.shape)
-            self.Y_train_low_dim_pred = self.Y_train_low_dim_pred.reshape(-1, 1)
+            self.Y_train_low_dim_pred = np.zeros((self.n_samples_train, self.low_dim_y))
+            for i in range(self.low_dim_y):
+                self.Y_train_low_dim_pred[:,i] = self.low_dim_regressor_list[i].predict(self.X_train_low_dim)
             print(self.Y_train_low_dim_pred.shape)
             self.Y_train_pred = self.PCA_model_y.inverse_transform(self.Y_train_low_dim_pred)
             self.train_rmse = np.sqrt(np.mean((Y_train - self.Y_train_pred) ** 2, axis=1))
             
     
-    def predict(self, X):
+    def predict(self, X, return_std = False):
         if self.n_features != X.shape[1]:
             raise ValueError("Input dimension mismatch")
         X_low_dim = self.PCA_model_x.transform(X)
-        Y_low_dim = self.low_dim_regressor.predict(X_low_dim)
-        Y_low_dim = Y_low_dim.reshape(-1, 1)
-        return self.PCA_model_y.inverse_transform(Y_low_dim)
+        Y_low_dim_pred = np.zeros((X.shape[0], self.low_dim_y))
+        for i in range(self.low_dim_y):
+            Y_low_dim_pred[:,i] = self.low_dim_regressor_list[i].predict(X_low_dim)
+        Y_pred = self.PCA_model_y.inverse_transform(Y_low_dim_pred)
+        return Y_pred
     
     def test(self, X_test, Y_test):
         Y_test_pred = self.predict(X_test)
@@ -54,15 +69,20 @@ class first_model():
         return rmse, R2
     
 class GP_regressor():
-    def __init__(self, kernel = gpx.kernels.RBF(), mean_function = gpx.mean_functions.Zero()):
-        self.kernel = kernel
-        self.mean_function = mean_function
+    def __init__(self, GP_params = None):
+        if GP_params is not None:
+            self.kernel = GP_params['kernel']
+            self.mean_function = GP_params['mean_function']
+        else:
+            self.kernel = gpx.kernels.RBF()
+            self.mean_function = gpx.mean_functions.Zero()
         self.prior = gpx.gps.Prior(mean_function=self.mean_function, kernel=self.kernel)
         return None
     
     def fit(self, X_train, Y_train):
         self.n_samples_train = X_train.shape[0]
         self.n_features = X_train.shape[1]
+        Y_train = Y_train.reshape(-1, 1)
         self.n_targets = Y_train.shape[1]
 
         self.D = gpx.Dataset(X=X_train, y=Y_train)
