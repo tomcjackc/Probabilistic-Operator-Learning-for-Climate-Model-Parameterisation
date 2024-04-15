@@ -69,7 +69,8 @@ class first_model():
         return rmse, R2
     
 class GP_regressor():
-    def __init__(self, GP_params = None):
+    def __init__(self, GP_params = None, tune_hypers = True):
+        self.tune_hypers = tune_hypers
         if GP_params is not None:
             self.kernel = GP_params['kernel']
             self.mean_function = GP_params['mean_function']
@@ -85,12 +86,16 @@ class GP_regressor():
         Y_train = Y_train.reshape(-1, 1)
         self.n_targets = Y_train.shape[1]
 
-        self.D = gpx.Dataset(X=X_train, y=Y_train)
+        self.D = gpx.Dataset(X=X_train.astype('double'), y=Y_train.astype('double'))
         likelihood = gpx.likelihoods.Gaussian(num_datapoints=self.D.n)
         posterior = self.prior * likelihood
-        negative_mll = gpx.objectives.ConjugateMLL(negative=True)
-        negative_mll = jit(negative_mll)
-        self.opt_posterior, self.history = gpx.fit_scipy(model=posterior, objective=negative_mll, train_data=self.D)
+        if self.tune_hypers:
+            negative_mll = gpx.objectives.ConjugateMLL(negative=True)
+            negative_mll = jit(negative_mll)
+            # hyperparam tuning
+            self.opt_posterior, self.history = gpx.fit_scipy(model=posterior, objective=negative_mll, train_data=self.D, max_iters=1000)
+        else:
+            self.opt_posterior = posterior
         
     def sample_prior(self, X_test, n_samples):
         prior_dist = self.prior.predict(X_test)
