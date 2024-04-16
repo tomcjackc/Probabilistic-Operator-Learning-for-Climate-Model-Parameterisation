@@ -21,7 +21,7 @@ class first_model():
         self.multiinput = multiinput
         self.has_history = False
 
-    def fit(self, X_train, Y_train, save = False):
+    def fit(self, X_train, Y_train, save = False, return_bounds: bool | float | int = False):
         self.n_samples_train = X_train.shape[0]
         self.n_features = X_train.shape[1]
         self.n_targets = Y_train.shape[1]
@@ -51,31 +51,42 @@ class first_model():
         if save:
             # record training results
             self.Y_train_low_dim_pred = np.zeros((self.n_samples_train, self.low_dim_y))
+            self.Y_train_low_dim_pred_upper = np.zeros((self.n_samples_train, self.low_dim_y))
+            self.Y_train_low_dim_pred_lower = np.zeros((self.n_samples_train, self.low_dim_y))
             if self.multiinput:
                 for i in range(self.low_dim_y):
-                    self.Y_train_low_dim_pred[:,i] = self.low_dim_regressor_list[i].predict(self.X_train_low_dim)
+                    mean_and_bounds = self.low_dim_regressor_list[i].predict(self.X_train_low_dim, return_bounds)
+                    self.Y_train_low_dim_pred[:,i], self.Y_train_low_dim_pred_upper[:,i], self.Y_train_low_dim_pred_lower[:,i] = mean_and_bounds[0], mean_and_bounds[1], mean_and_bounds[2]
             else:
                 for i in range(self.low_dim_y):
-                    self.Y_train_low_dim_pred[:,i] = self.low_dim_regressor_list[i].predict(self.X_train_low_dim[:,i].reshape(-1,1))
+                    mean_and_bounds = self.low_dim_regressor_list[i].predict(self.X_train_low_dim[:,i].reshape(-1,1), return_bounds)
+                    self.Y_train_low_dim_pred[:,i], self.Y_train_low_dim_pred_upper[:,i], self.Y_train_low_dim_pred_lower[:,i] = mean_and_bounds[0], mean_and_bounds[1], mean_and_bounds[2]
             print(self.Y_train_low_dim_pred.shape)
             self.Y_train_pred = self.PCA_model_y.inverse_transform(self.Y_train_low_dim_pred)
             self.train_rmse = np.sqrt(np.mean((Y_train - self.Y_train_pred) ** 2, axis=1))
             self.has_history = True
             
     
-    def predict(self, X, return_std = False):
+    def predict(self, X, return_std = False, return_bounds: bool | float | int = False):
         if self.n_features != X.shape[1]:
             raise ValueError("Input dimension mismatch")
         X_low_dim = self.PCA_model_x.transform(X)
         Y_low_dim_pred = np.zeros((X.shape[0], self.low_dim_y))
+        Y_low_dim_pred_upper = np.zeros((X.shape[0], self.low_dim_y))
+        Y_low_dim_pred_lower = np.zeros((X.shape[0], self.low_dim_y))
         if self.multiinput:
             for i in range(self.low_dim_y):
-                Y_low_dim_pred[:,i] = self.low_dim_regressor_list[i].predict(X_low_dim)
+                Y_low_dim_pred[:,i], Y_low_dim_pred_upper[:,i], Y_low_dim_pred_lower[:,i] = self.low_dim_regressor_list[i].predict(X_low_dim, return_bounds)
         else:
             for i in range(self.low_dim_y):
-                Y_low_dim_pred[:,i] = self.low_dim_regressor_list[i].predict(X_low_dim[:,i].reshape(-1,1))
+                Y_low_dim_pred[:,i], Y_low_dim_pred_upper[:,i], Y_low_dim_pred_lower[:,i] = self.low_dim_regressor_list[i].predict(X_low_dim[:,i].reshape(-1,1), return_bounds)
         Y_pred = self.PCA_model_y.inverse_transform(Y_low_dim_pred)
-        return Y_pred
+        Y_pred_upper = self.PCA_model_y.inverse_transform(Y_low_dim_pred_upper)
+        Y_pred_lower = self.PCA_model_y.inverse_transform(Y_low_dim_pred_lower)
+        if return_bounds is False:
+            return Y_pred
+        else:
+            return Y_pred, Y_pred_lower, Y_pred_upper
     
     def test(self, X_test, Y_test):
         Y_test_pred = self.predict(X_test)
@@ -123,7 +134,7 @@ class GP_regressor():
         samples = np.random.multivariate_normal(mean, cov, n_samples)
         return mean, cov, samples
     
-    def predict(self, X_test):
+    def predict(self, X_test, return_bounds: bool | float | int = False):
         # if self.n_features != X_test.shape[1]:
         #     raise ValueError("Input dimension mismatch")
         latent_dist = self.opt_posterior.predict(X_test, train_data=self.D)
@@ -131,4 +142,14 @@ class GP_regressor():
 
         predictive_mean = predictive_dist.mean()
         predictive_std = predictive_dist.stddev()
-        return predictive_mean
+        if return_bounds is True:
+            lower_bound = predictive_mean - 2 * predictive_std
+            upper_bound = predictive_mean + 2 * predictive_std
+            return predictive_mean, lower_bound, upper_bound
+        elif return_bounds is False:
+            return predictive_mean, np.zeros_like(predictive_mean), np.zeros_like(predictive_mean)
+        else:
+            lower_bound = predictive_mean - return_bounds * predictive_std
+            upper_bound = predictive_mean + return_bounds * predictive_std
+            return predictive_mean, lower_bound, upper_bound
+        
