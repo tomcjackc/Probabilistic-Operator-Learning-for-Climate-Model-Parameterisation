@@ -13,6 +13,7 @@ from sklearn.gaussian_process.kernels import Matern, RBF
 from tqdm import tqdm
 import multiprocessing as mp
 from functools import partial
+import tensorflow_probability.substrates.jax.bijectors as tfb
 
 class first_model():
     def __init__(self, low_dim_x, low_dim_y = 1, low_dim_regressor = 'linear', GP_params = None, multiinput = False):
@@ -138,7 +139,11 @@ class GP_regressor():
 
         self.D = gpx.Dataset(X=X_train.astype('double'), y=Y_train.astype('double'))
         likelihood = gpx.likelihoods.Gaussian(num_datapoints=self.D.n)#, obs_stddev=jnp.array(1e-3)) # here i choose the value of obs_stddev
+        
         posterior = self.prior * likelihood
+
+        
+
         if self.tune_hypers:
             negative_mll = gpx.objectives.ConjugateMLL(negative=True)
             negative_mll = jit(negative_mll)
@@ -166,7 +171,7 @@ class GP_regressor():
 
         predictive_mean = predictive_dist.mean()
         predictive_std = predictive_dist.stddev()
-        print(predictive_std)
+        # print(predictive_std)
         if return_bounds is True:
             lower_bound = predictive_mean - 2 * predictive_std
             upper_bound = predictive_mean + 2 * predictive_std
@@ -203,7 +208,7 @@ class second_model():
 
     #     return np.stack(pred).T
     
-    def train_test(self, x_train, x_test, y_train, model, parallel = False, verbose = False):
+    def train_test(self, x_train, x_test, y_train, parallel = False, verbose = False):
         self.x_train = x_train
         self.x_test = x_test
         self.y_train = y_train
@@ -211,21 +216,161 @@ class second_model():
         self.x_train_pca = self.x_pca.fit_transform(x_train)
         self.x_test_pca = self.x_pca.transform(x_test)
 
-        if parallel:
-            pool = mp.Pool(mp.cpu_count())
-            f = partial(fit_predict, model = model, x_train_pca = self.x_train_pca, y_train = y_train, x_test_pca = self.x_test_pca, verbose = verbose)
-            pred = pool.map(f, range(y_train.shape[-1]))
-        else:
-            pred = []
-            for i in tqdm(range(y_train.shape[-1])):
-                model.fit(self.x_train_pca, y_train[:, i])
-                pred.append(model.predict(self.x_test_pca, return_std = True))
+        
+        pred = []
+        for i in tqdm(range(y_train.shape[-1])):
+            kernel = Matern(nu = 2.5)
+            model = GaussianProcessRegressor(kernel = kernel, alpha = 1e-10,  normalize_y = True, random_state= 1172023)
+            model.fit(self.x_train_pca, y_train[:, i])
+            pred.append(model.predict(self.x_test_pca, return_std = True))
+            if verbose:
+                print(model.kernel_)
 
 
         return np.stack(pred).T
     
-def fit_predict(i, model, x_train_pca, y_train, x_test_pca, verbose):
-    if verbose:
-        print(model.kernel_)
-    model.fit(x_train_pca, y_train[:, i])
-    return model.predict(x_test_pca, return_std = True)
+
+class third_model():
+    def __init__(self, n, m, multiinput = False, GP_params = None):
+        self.n = n
+        self.m = m
+        
+        self.multiinput = multiinput
+        self.GP_params = GP_params
+
+        if not self.multiinput:
+            self.m = self.n
+
+        return None
+    
+    def fit(self, x_train, y_train):
+        if self.m is None:
+            self.m = y_train.shape[1]
+
+        self.low_dim_regressor_list = [GP_regressor(self.GP_params) for i in range(self.m)]
+
+        self.x_pca = PCA(n_components=self.n)
+        self.y_pca = PCA(n_components=self.m)
+        self.x_train_pca = self.x_pca.fit_transform(x_train)
+        self.y_train_pca = self.y_pca.fit_transform(y_train)
+
+        self.x_scaler_list = []
+        self.y_scaler_list = []
+        for i in range(self.n):
+            x_scaler = skl.preprocessing.StandardScaler().fit(self.x_train_pca[:, i].reshape(-1, 1))
+            print(np.mean(self.x_train_pca[:, i]), np.std(self.x_train_pca[:, i]))
+            self.x_train_pca[:, i] = x_scaler.transform(self.x_train_pca[:, i].reshape(-1, 1)).reshape(-1)
+            print(np.mean(self.x_train_pca[:, i]), np.std(self.x_train_pca[:, i]))
+            self.x_scaler_list.append(x_scaler)
+        for i in range(self.m):
+            y_scaler = skl.preprocessing.StandardScaler().fit(self.y_train_pca[:, i].reshape(-1, 1))
+            self.y_train_pca[:, i] = y_scaler.transform(self.y_train_pca[:, i].reshape(-1, 1)).reshape(-1)
+            self.y_scaler_list.append(y_scaler)
+
+        if self.multiinput:
+            for i in range(self.m):
+                self.low_dim_regressor_list[i].fit(self.x_train_pca, self.y_train_pca[:, i])
+        else:
+            for i in range(self.m):
+                self.low_dim_regressor_list[i].fit(self.x_train_pca[:, i].reshape(-1,1), self.y_train_pca[:, i])
+        return None
+    
+    def predict(self, x_test):
+        self.x_test_pca = self.x_pca.transform(x_test)
+
+        for i, x_scaler in enumerate(self.x_scaler_list):
+            self.x_test_pca[:, i] = x_scaler.transform(self.x_test_pca[:, i].reshape(-1, 1)).reshape(-1)
+        
+
+        self.y_test_pca_pred = np.zeros((x_test.shape[0], self.m))
+        self.y_test_pca_pred_upper = np.zeros((x_test.shape[0], self.m))
+        self.y_test_pca_pred_lower = np.zeros((x_test.shape[0], self.m))
+
+        if self.multiinput:
+            for i in range(self.m):
+                self.y_test_pca_pred[:,i], self.y_test_pca_pred_upper[:,i], self.y_test_pca_pred_lower[:,i] = self.low_dim_regressor_list[i].predict(self.x_test_pca, return_bounds = True)
+        else:
+            for i in range(self.m):
+                self.y_test_pca_pred[:,i], self.y_test_pca_pred_upper[:,i], self.y_test_pca_pred_lower[:,i] = self.low_dim_regressor_list[i].predict(self.x_test_pca[:,i].reshape(-1,1), return_bounds = True)
+
+        for i, y_scaler in enumerate(self.y_scaler_list):
+            self.y_test_pca_pred[:, i] = x_scaler.inverse_transform(self.x_test_pca[:, i].reshape(-1, 1)).reshape(-1)
+
+        y_pred = self.y_pca.inverse_transform(self.y_test_pca_pred)
+        y_pred_upper = self.y_pca.inverse_transform(self.y_test_pca_pred_upper)
+        y_pred_lower = self.y_pca.inverse_transform(self.y_test_pca_pred_lower)
+
+        return y_pred, y_pred_lower, y_pred_upper
+    
+    
+class fourth_model():
+    def __init__(self, n, m, multiinput = False, GP_params = None):
+        self.n = n
+        self.m = m
+        
+        self.multiinput = multiinput
+        self.GP_params = GP_params
+
+        if not self.multiinput:
+            self.m = self.n
+
+        return None
+    
+    def fit(self, x_train, y_train, plot = False):
+        if self.m is None:
+            self.m = y_train.shape[1]
+
+        self.x_pca = PCA(n_components=self.n)
+        self.y_pca = PCA(n_components=self.m)
+        self.x_train_pca = self.x_pca.fit_transform(x_train)
+        self.y_train_pca = self.y_pca.fit_transform(y_train)
+
+        # self.x_scaler = skl.preprocessing.StandardScaler().fit(self.x_train_pca)
+        # #print(f'before: {[np.mean(self.x_train_pca[:, i]), np.std(self.x_train_pca[:, i]) for i in range(self.n)]}')
+        # self.x_train_pca = self.x_scaler.transform(self.x_train_pca)
+        # #print(f'after: {[np.mean(self.x_train_pca[:, i]), np.std(self.x_train_pca[:, i]) for i in range(self.n)]}')
+        
+        # self.y_scaler = skl.preprocessing.StandardScaler().fit(self.y_train_pca)
+        # self.y_train_pca = self.y_scaler.transform(self.y_train_pca)
+
+        self.low_dim_regressor_list = []
+
+        if self.multiinput:
+            for i in tqdm(range(self.m)):
+                kernel = Matern(nu = 2.5)
+                gp = GaussianProcessRegressor(kernel, alpha = 1e-10,  normalize_y = True, random_state = 1172023) 
+                gp.fit(self.x_train_pca, self.y_train_pca[:, i])
+                self.low_dim_regressor_list.append(gp)
+                print(gp.kernel_)
+        else:
+            for i in tqdm(range(self.m)):
+                kernel = Matern(nu = 2.5)
+                gp = GaussianProcessRegressor(kernel, alpha = 1e-10,  normalize_y = True, random_state = 1172023) 
+                gp.fit(self.x_train_pca[:, i].reshape(-1,1), self.y_train_pca[:, i])
+                self.low_dim_regressor_list.append(gp)
+                print(gp.kernel_)
+        return None
+    
+    def predict(self, x_test):
+        self.x_test_pca = self.x_pca.transform(x_test)
+
+        # self.x_test_pca = self.x_scaler.transform(self.x_test_pca)
+        
+        self.y_test_pca_pred = np.zeros((x_test.shape[0], self.m))
+        self.y_test_pca_pred_upper = np.zeros((x_test.shape[0], self.m))
+        self.y_test_pca_pred_lower = np.zeros((x_test.shape[0], self.m))
+
+        if self.multiinput:
+            for i in range(self.m):
+                self.y_test_pca_pred[:,i] = self.low_dim_regressor_list[i].predict(self.x_test_pca)
+        else:
+            for i in range(self.m):
+                self.y_test_pca_pred[:,i] = self.low_dim_regressor_list[i].predict(self.x_test_pca[:,i].reshape(-1,1))
+
+        # self.y_test_pca_pred = self.y_scaler.inverse_transform(self.y_test_pca_pred)
+
+        y_pred = self.y_pca.inverse_transform(self.y_test_pca_pred)
+        # y_pred_upper = self.y_pca.inverse_transform(self.y_test_pca_pred_upper)
+        # y_pred_lower = self.y_pca.inverse_transform(self.y_test_pca_pred_lower)
+
+        return y_pred #, y_pred_lower, y_pred_upper
