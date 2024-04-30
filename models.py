@@ -138,11 +138,11 @@ class GP_regressor():
         self.n_targets = Y_train.shape[1]
 
         self.D = gpx.Dataset(X=X_train.astype('double'), y=Y_train.astype('double'))
-        likelihood = gpx.likelihoods.Gaussian(num_datapoints=self.D.n)#, obs_stddev=jnp.array(1e-3)) # here i choose the value of obs_stddev
+        likelihood = gpx.likelihoods.Gaussian(num_datapoints=self.D.n, obs_stddev=jnp.array(1e-3)) # here i choose the value of obs_stddev
         
         posterior = self.prior * likelihood
 
-        
+        #posterior = posterior.replace_bijector(lengthscale=tfb.SoftClip(low=jnp.array(1e-3, dtype=jnp.float64))
 
         if self.tune_hypers:
             negative_mll = gpx.objectives.ConjugateMLL(negative=True)
