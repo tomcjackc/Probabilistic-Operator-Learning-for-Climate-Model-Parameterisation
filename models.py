@@ -125,11 +125,15 @@ class GP_regressor():
         if GP_params is not None:
             self.kernel = GP_params['kernel']
             self.mean_function = GP_params['mean_function']
+            self.multiinput = GP_params['multiinput']
         else:
             self.kernel = gpx.kernels.RBF()
             self.mean_function = gpx.mean_functions.Zero()
+            self.multiinput = False
         
-        self.kernel = self.kernel.replace_bijector(lengthscale=tfb.SoftClip(low=jnp.array(1e-3, dtype=jnp.float64), high=jnp.array(4e0, dtype=jnp.float64)))
+        if self.multiinput:
+            # constrain lengthscales (exact constraint tbd)
+            self.kernel = self.kernel.replace_bijector(lengthscale=tfb.SoftClip(low=jnp.array(1e-3, dtype=jnp.float64), high=jnp.array(4e0, dtype=jnp.float64)))
 
         self.prior = gpx.gps.Prior(mean_function=self.mean_function, kernel=self.kernel)
         return None
@@ -141,7 +145,7 @@ class GP_regressor():
         self.n_targets = Y_train.shape[1]
 
         self.D = gpx.Dataset(X=X_train.astype('double'), y=Y_train.astype('double'))
-        likelihood = gpx.likelihoods.Gaussian(num_datapoints=self.D.n, obs_stddev=jnp.array(1e-3)) # here i choose the value of obs_stddev
+        likelihood = gpx.likelihoods.Gaussian(num_datapoints=self.D.n, obs_stddev=1e-3) # here i choose the value of obs_stddev
         
         posterior = self.prior * likelihood
 
@@ -163,6 +167,13 @@ class GP_regressor():
         cov = prior_dist.covariance()
         samples = np.random.multivariate_normal(mean, cov, n_samples)
         return mean, cov, samples
+    
+    def sample_posterior(self, X_test, n_samples):
+        posterior_dist = self.opt_posterior.predict(X_test, self.D)
+        mean = posterior_dist.mean()
+        cov = posterior_dist.covariance()
+        samples = np.random.multivariate_normal(mean, cov, n_samples)
+        return samples.T
     
     def predict(self, X_test, return_bounds: bool | float | int = False):
         # if self.n_features != X_test.shape[1]:
