@@ -128,6 +128,9 @@ class GP_regressor():
         else:
             self.kernel = gpx.kernels.RBF()
             self.mean_function = gpx.mean_functions.Zero()
+        
+        self.kernel = self.kernel.replace_bijector(lengthscale=tfb.SoftClip(low=jnp.array(1e-3, dtype=jnp.float64), high=jnp.array(4e0, dtype=jnp.float64)))
+
         self.prior = gpx.gps.Prior(mean_function=self.mean_function, kernel=self.kernel)
         return None
     
@@ -141,8 +144,6 @@ class GP_regressor():
         likelihood = gpx.likelihoods.Gaussian(num_datapoints=self.D.n, obs_stddev=jnp.array(1e-3)) # here i choose the value of obs_stddev
         
         posterior = self.prior * likelihood
-
-        #posterior = posterior.replace_bijector(lengthscale=tfb.SoftClip(low=jnp.array(1e-3, dtype=jnp.float64))
 
         if self.tune_hypers:
             negative_mll = gpx.objectives.ConjugateMLL(negative=True)
