@@ -133,7 +133,8 @@ class GP_regressor():
         
         if self.multiinput:
             # constrain lengthscales (exact constraint tbd)
-            self.kernel = self.kernel.replace_bijector(lengthscale=tfb.SoftClip(low=jnp.array(1e-3, dtype=jnp.float64), high=jnp.array(4e0, dtype=jnp.float64)))
+            self.kernel = self.kernel.replace_bijector(lengthscale=tfb.SoftClip(low=jnp.array(1e-3, dtype=jnp.float64), high=jnp.array(5e0, dtype=jnp.float64)))
+            # self.kernel = self.kernel.replace_bijector(variance=tfb.SoftClip(low=jnp.array(1e-3, dtype=jnp.float64), high=jnp.array(1e2, dtype=jnp.float64)))
 
         self.prior = gpx.gps.Prior(mean_function=self.mean_function, kernel=self.kernel)
         return None
@@ -144,8 +145,18 @@ class GP_regressor():
         Y_train = Y_train.reshape(-1, 1)
         self.n_targets = Y_train.shape[1]
 
+        # check statistics
+        # print(f'x_train: mean = {np.mean(X_train, axis = 0)}, std = {np.std(X_train, axis = 0)}')
+        # print(f'y_train: mean = {np.mean(Y_train)}, std = {np.std(Y_train)}')
+        # for i, PC in enumerate(X_train.T):
+        #     print(PC.shape)
+        #     plt.figure()
+        #     plt.hist(PC)
+        #     plt.show()
+
         self.D = gpx.Dataset(X=X_train.astype('double'), y=Y_train.astype('double'))
-        likelihood = gpx.likelihoods.Gaussian(num_datapoints=self.D.n, obs_stddev=1e-3) # here i choose the value of obs_stddev
+        likelihood = gpx.likelihoods.Gaussian(num_datapoints=self.D.n) # here i choose the value of obs_stddev
+        likelihood = likelihood.replace_bijector(obs_stddev=tfb.SoftClip(low=jnp.array(1e-2, dtype=jnp.float64)))
         
         posterior = self.prior * likelihood
 
@@ -156,6 +167,7 @@ class GP_regressor():
             self.opt_posterior, self.history = gpx.fit_scipy(model=posterior, objective=negative_mll, train_data=self.D, max_iters=1000)
             # print(dir(self.opt_posterior))
             # print(self.history)
+
             print(self.opt_posterior.prior)
             print(self.opt_posterior.likelihood)
         else:
