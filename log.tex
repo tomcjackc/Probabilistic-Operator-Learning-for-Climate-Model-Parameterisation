@@ -40,7 +40,7 @@
   \cmd{while} \; #1 \; \cmd{do} \; #2 }
 
 % \ang{x} typesets x in angled brackets
-\newcommand{\ang}[1]{\langle #1 \rangle}
+% \newcommand{\ang}[1]{\langle #1 \rangle}
 
 % The following two macros are for typesetting rules and derivations
 % Usage: \drule{rule name}{premise1 \\ premise2 \\ premise3 ...}{conclusion}
@@ -68,13 +68,13 @@
 \newcommand{\stor}{\tname{Store}}
 \newcommand{\heap}{\tname{Heap}}
 \newcommand{\bv}{\tname{BVal}}
-\newcommand{\ad}[1]{\ulcorner {#1} \urcorner}
+% \newcommand{\ad}[1]{\ulcorner {#1} \urcorner}
 \newcommand{\newp}{\texttt{newpair}}
 \newcommand{\fst}[1]{{#1}.\texttt{fst}}
 \newcommand{\snd}[1]{{#1}.\texttt{snd}}
-\newcommand{\stof}[2]{\texttt{fst} [ {#1} ] \leftarrow {#2}}
-\newcommand{\stos}[2]{\texttt{snd} [ {#1} ] \leftarrow {#2}}
-\newcommand{\dom}[1]{\mathrm{dom}(#1)}
+% \newcommand{\stof}[2]{\texttt{fst} [ {#1} ] \leftarrow {#2}}
+% \newcommand{\stos}[2]{\texttt{snd} [ {#1} ] \leftarrow {#2}}
+% \newcommand{\dom}[1]{\mathrm{dom}(#1)}
 \newcommand{\bse}{\bigstep_e}
 \newcommand{\bsc}{\bigstep_c}
 \newcommand{\bsb}{\bigstep_b}
@@ -83,9 +83,9 @@
 \newcommand{\tc}{\Gamma} % Type context
 \newcommand{\tnat}{\mathsf{nat}}
 \newcommand{\tpair}[2]{(#1,#2)}
-\newcommand{\hptyp}[3]{#1 \Vdash #2 : #3}
-\newcommand{\tcompat}[3]{#1 ; #2 ; #3 \vdash \textsf{\textup{well-typed}}}
-\newcommand{\etyp}[3]{#1 \vdash #2 : #3}
+% \newcommand{\hptyp}[3]{#1 \Vdash #2 : #3}
+% \newcommand{\tcompat}[3]{#1 ; #2 ; #3 \vdash \textsf{\textup{well-typed}}}
+% \newcommand{\etyp}[3]{#1 \vdash #2 : #3}
 
 
 \begin{document}
@@ -101,23 +101,23 @@ result was slightly worse, with test rel L2 = 24\%, with more PCA components bei
 unsure of the reason for this, but the values barely move from their initialisation, so maybe an issue with the optimiser?
 weird structure in the std is less visible now.
 
-ran the experiment again (n = m = 45, ARD false, multi true, stand true) with the same param constraints (1e-3<ls<10, 1e-3<var<10, 1e-3<obs_noise), but with initialisations at 2.0 rather than 1.0, on the off-chance that this happens to be a local minimum in some dimensions (maybe due to standardisation?).
+ran the experiment again (n = m = 45, ARD false, multi true, stand true) with the same param constraints (1e-3<ls<10, 1e-3<var<10, 1e-3<obs noise), but with initialisations at 2.0 rather than 1.0, on the off-chance that this happens to be a local minimum in some dimensions (maybe due to standardisation?).
 there was no overfitting, all components were fit fairly well. 
-MLL ~-500.
-Test rel L2 = 0.10\%, visually very good.
+MLL \~-500.
+Test rel L2 = 10\%, visually very good.
 
 Investigating the spatial structure of the PCA components to attempt to explain the structure observed in the std.
 the diagonal bands observed in std match the pattern of the PCA14, which was the component of the PCA that was overfit in the first experiment.
 
-Ran experiment with initial values of var and ls = 2.0, obs_noise = 1.0, ARD = false, multi = true, stand = true, n = 45, m = 5, although with lengthscale constraint of 1e-3<ls<20.
-MLL values ~-1500, looking promising that this could improve results, obs_noise values sticking to lower limit as previously.
+Ran experiment with initial values of var and ls = 2.0, obs noise = 1.0, ARD = false, multi = true, stand = true, n = 45, m = 5, although with lengthscale constraint of 1e-3<ls<20.
+MLL values \~-1500, looking promising that this could improve results, obs noise values sticking to lower limit as previously.
 
 Ran same experiment again, this time with upper limit on lengthscale increased to 30.
-MLL values ~-1900 now, with obs_noise values sticking to lower limit as previously.
+MLL values \~-1900 now, with obs noise values sticking to lower limit as previously.
 
 Ran same experiment again, this time with upper limit on lengthscale removed.
-MLL values ~-2200 now, with obs_noise values sticking to lower limit as previously.
-Lengthscales selected for the 5 components tested ~60.
+MLL values \~-2200 now, with obs noise values sticking to lower limit as previously.
+Lengthscales selected for the 5 components tested \~60.
 
 Commit 72afcc2.
 
@@ -127,7 +127,13 @@ This motivates use of a single PCA for both x and y?
 Perhaps using a single PCA for both x and y would allow the model to learn the spatial structure of the data better, as it would be able to learn the spatial structure of the data in both spaces simultaneously, rather than independently, and might make the latent spaces more compatible.
 A simple data concatenation could work.
 
-Ran full experiment again, with lengthscale constraint of 1e-3<ls, and initial values of var and ls = 2.0, obs_noise = 1.0, ARD = false, multi = true, stand = true, n = 45, m = 45.
+Commit 4431bf9.
+
+Ran full experiment again, with lengthscale constraint of 1e-3<ls, and initial values of var and ls = 2.0, obs noise = 1.0, ARD = false, multi = true, stand = true, n = 45, m = 45.
+there was no overfitting, all components were fit fairly well. 
+MLL ranging from \~-2300 \- \~0.
+Test rel L2 = 7.6\%, visually very good.
+Lengthscales selected ranged from \~60 for the first few components, to \~20 for the last few.
 
 
 
