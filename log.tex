@@ -119,6 +119,14 @@ Ran same experiment again, this time with upper limit on lengthscale removed.
 MLL values ~-2200 now, with obs_noise values sticking to lower limit as previously.
 Lengthscales selected for the 5 components tested ~60.
 
+Commit 72afcc2.
+
+Looking more at the PCA acting on x and y separately.
+for most components, the PCA is generating very similar PCs, but for some components, the PCs are very different, seemingly in antiphase in some cases (including PC14 which was problematic earlier).
+This motivates use of a single PCA for both x and y? 
+Perhaps using a single PCA for both x and y would allow the model to learn the spatial structure of the data better, as it would be able to learn the spatial structure of the data in both spaces simultaneously, rather than independently, and might make the latent spaces more compatible.
+A simple data concatenation could work.
+
 Ran full experiment again, with lengthscale constraint of 1e-3<ls, and initial values of var and ls = 2.0, obs_noise = 1.0, ARD = false, multi = true, stand = true, n = 45, m = 45.
 
 
