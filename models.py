@@ -131,10 +131,10 @@ class GP_regressor():
             self.mean_function = gpx.mean_functions.Zero()
             self.multiinput = False
         
-        if self.multiinput:
-            # constrain lengthscales (exact constraint tbd)
-            self.kernel = self.kernel.replace_bijector(lengthscale=tfb.SoftClip(low=jnp.array(1e-3, dtype=jnp.float64), high=jnp.array(5e0, dtype=jnp.float64)))
-            # self.kernel = self.kernel.replace_bijector(variance=tfb.SoftClip(low=jnp.array(1e-3, dtype=jnp.float64), high=jnp.array(1e2, dtype=jnp.float64)))
+        
+        # constrain lengthscales (exact constraint tbd)
+        self.kernel = self.kernel.replace_bijector(lengthscale=tfb.SoftClip(low=jnp.array(1e-3, dtype=jnp.float64), high=jnp.array(1e1, dtype=jnp.float64)))
+        self.kernel = self.kernel.replace_bijector(variance=tfb.SoftClip(low=jnp.array(1e-3, dtype=jnp.float64), high=jnp.array(1e1, dtype=jnp.float64)))
 
         self.prior = gpx.gps.Prior(mean_function=self.mean_function, kernel=self.kernel)
         return None
@@ -154,9 +154,9 @@ class GP_regressor():
         #     plt.hist(PC)
         #     plt.show()
 
-        self.D = gpx.Dataset(X=X_train.astype('double'), y=Y_train.astype('double'))
-        likelihood = gpx.likelihoods.Gaussian(num_datapoints=self.D.n) # here i choose the value of obs_stddev
-        likelihood = likelihood.replace_bijector(obs_stddev=tfb.SoftClip(low=jnp.array(1e-2, dtype=jnp.float64)))
+        self.D = gpx.Dataset(X=jnp.array(X_train, dtype=jnp.float64), y=jnp.array(Y_train, dtype=jnp.float64))
+        likelihood = gpx.likelihoods.Gaussian(num_datapoints=self.D.n, obs_stddev=jnp.array([1.0], dtype=jnp.float64)) # here i choose the value of obs_stddev
+        likelihood = likelihood.replace_bijector(obs_stddev=tfb.SoftClip(low=jnp.array(1e-3, dtype=jnp.float64)))
         
         posterior = self.prior * likelihood
 
@@ -164,6 +164,8 @@ class GP_regressor():
             negative_mll = gpx.objectives.ConjugateMLL(negative=True)
             negative_mll = jit(negative_mll)
             # hyperparam tuning
+            print(likelihood.obs_stddev)
+            print(likelihood.obs_stddev.dtype)
             self.opt_posterior, self.history = gpx.fit_scipy(model=posterior, objective=negative_mll, train_data=self.D, max_iters=1000)
             # print(dir(self.opt_posterior))
             # print(self.history)
