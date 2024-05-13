@@ -96,6 +96,8 @@
 
 \section{09/05/24}
 
+\textbf{working in charing cross}
+
 reproduced result sent to Henry on the 7th, although with less strict constraints on kernel and likelihood params. 
 result was slightly worse, with test rel L2 = 24\%, with more PCA components being overfit.
 unsure of the reason for this, but the values barely move from their initialisation, so maybe an issue with the optimiser?
@@ -141,7 +143,21 @@ Commit 96921a5.
 
 \subsection{Project work}
 
+Motivated by the individual x and y PCA results being similar in most cases, but very different in others (sometimes in antiphase), I implemented the combined PCA by concatenating the x and y training data into a single vector of length 2*4096.
+I then fit a 'combined' PCA on the double-length vector, generating a PCA with components made up of directions in 2*4096-dimensional space.
+When i interrogated the patterns selected by the PCA in this case, by manually splitting the PCA components, the components were extremely similar in x and y.
+The correlations were all now positive and very close to 1, with a gradual decrease with increasing component number, as you would expect as the "lengthscale" of the components gets smaller in physical space.
+In the implementation, I manually create self.x_pca and self.y_pca by extracting the relevant components from self.combined_pca and bypassing the fit method.
+The x and y latent spaces are now restricted to being the same dimensionality which is no problem.
+Running with n = m = 5 yields no errors, will do a full experiment later.
 
+Ran experiment as above, with n = m = 45.
+With the same dimensionality as the previous experiment, it is expected that the results will be slightly worse, as the PCA is slightly less optimal on the y data alone, therefore more components will be required in order to capture the same amount of variance.
+Test rel L2 = 7.9\%, visually very good.
+Lengthscales selected ranged from $\sim$60 for the first few components, to $\sim$20 for the last few.
+
+Added extra plotting to visualise the uncertainty in predicting each PC. 
+In the case above, the uncertainty in each PC was very small, until less significant PCs, where the confidence interval became much larger, and contained the true value in almost all cases.
 
 \subsection{Ethics Seminar 1}
 \textbf{A whistlestop tour of the ethics of research. Talk given by SJ Beard from CSER.}
@@ -169,6 +185,32 @@ I like the idea of having a firm belief in what my obligations are, and then hav
 Jakob not around in meeting, but Tom and I discussed the seminar.
 Discussed the ethics surrounding Tom's work using the camera traps, and the potential for the data to be used in ways that were not intended (images of people etc etc).
 My work doesn't seem to run into similar problems, but the data used for climate models could have implicit biases (global south vs north etc), so I should be mindful of this when contextualising the work.
+
+\section{13/05/24}
+
+Organise the notebook.
+
+Looking at the combined PCA again, determine the number of PCs required to capture 95\% of variance in x data, and 99\% of the variance in the y data.
+Here, we see that the PCA is clearly favouring the y data, as it requires fewer PCs to get a greater fraction of variance.
+This is because the x and y data are of different scales, y data tends to be $\sim$7 times larger than x data.
+
+To combat this, I will standardise the x and y data before running the combined PCA, which should remove the bias. 
+This could be a best practice to include in the separate PCA steps too.
+
+This is more complicated than I thought, the code is always normalising the explained_variance_ratio_ to sum to 1, even when using very few PCs, therefore I need to identify what the real normalisation is.
+I need to calculate the 'total variance' in x_train and y_train and I'm not sure if this is the standard definition.
+
+After standardising and isolating the 'total variance' in the x and y-specific PCAs, the cumulative variance explained curve is very wacky.
+The curve seems normal, with a plateau until around PC 100, then lots of later PCs seem to account for a surprisingly large amount of variance.
+I guess strange behaviour is to be expected, as pulling the PCA apart is quite an unnatural operation.
+This finding implies that to capture most ($\sim$99\%) of the variance, we would need over 100 PCs on both x and y.
+
+An alternative to consider might be to simply train a PCA on the y data and use it on both the inputs and outputs.
+This would mean training less GPs (which is the bottleneck), although they might have to be higher-dimensional in order to capture lots of variance in x.
+This is a tradeoff that would have to be made.
+The opposite idea would also be valid, training lots of lower-dimensional GPs.
+This choice could possibly be made according to the problem at hand?
+
 
 
 \end{document}
