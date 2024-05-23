@@ -147,7 +147,7 @@ Motivated by the individual x and y PCA results being similar in most cases, but
 I then fit a 'combined' PCA on the double-length vector, generating a PCA with components made up of directions in 2*4096-dimensional space.
 When i interrogated the patterns selected by the PCA in this case, by manually splitting the PCA components, the components were extremely similar in x and y.
 The correlations were all now positive and very close to 1, with a gradual decrease with increasing component number, as you would expect as the "lengthscale" of the components gets smaller in physical space.
-In the implementation, I manually create self.x_pca and self.y_pca by extracting the relevant components from self.combined_pca and bypassing the fit method.
+In the implementation, I manually create self.x pca and self.y pca by extracting the relevant components from self.combined pca and bypassing the fit method.
 The x and y latent spaces are now restricted to being the same dimensionality which is no problem.
 Running with n = m = 5 yields no errors, will do a full experiment later.
 
@@ -197,8 +197,8 @@ This is because the x and y data are of different scales, y data tends to be $\s
 To combat this, I will standardise the x and y data before running the combined PCA, which should remove the bias. 
 This could be a best practice to include in the separate PCA steps too.
 
-This is more complicated than I thought, the code is always normalising the explained_variance_ratio_ to sum to 1, even when using very few PCs, therefore I need to identify what the real normalisation is.
-I need to calculate the 'total variance' in x_train and y_train and I'm not sure if this is the standard definition.
+This is more complicated than I thought, the code is always normalising the explained variance ratio  to sum to 1, even when using very few PCs, therefore I need to identify what the real normalisation is.
+I need to calculate the 'total variance' in x train and y train and I'm not sure if this is the standard definition.
 
 After standardising and isolating the 'total variance' in the x and y-specific PCAs, the cumulative variance explained curve is very wacky.
 The curve seems normal, with a plateau until around PC 100, then lots of later PCs seem to account for a surprisingly large amount of variance.
@@ -235,7 +235,7 @@ Relative L2 = 4.1\%, visually poor, missing sharp features.
 Wrote master script to allow for the mass production of experiments.
 Including writing the dataloaders for each experiment individually.
 
-Coded up the combined PCA idea that involves concatenating along the n_samples axis, rather than the n_features axis.
+Coded up the combined PCA idea that involves concatenating along the nsamples axis, rather than the nfeatures axis.
 This is an alternative way of combining the PCAs, but it's not clear how it would work on problems where the input and output data are very different in shape.
 
 Applied the current model to the helmholtz problem.
@@ -256,7 +256,7 @@ Would be good to discuss this more with Henry tomorrow.
 
 \subsection{Project work}
 
-Henry had a similar idea about the joint optimisation of w_1 and w_2.
+Henry had a similar idea about the joint optimisation of w1 and w2.
 
 \textbf{Reading up about the Rayleigh quotient, which is the quantity that is maximised in the PCA problem.}
 
@@ -334,9 +334,9 @@ My current understanding of the problem they solved is:
 \begin{itemize}
   \item They ran a climate/fluids model under some intial conditions and at a high resolution.
   \item They then smoothed the velocity/momentum and temperature fields using a gaussian filter to remove all of the small-scale information.
-  \item Then they coarse-grained these smoothed fields to a low-resolution to obtain $\bar{(\mathbf{u}\cdot \del)\mathbf{u}}$
-  \item Then they run a low-resolution model from the same intial conditions/with the same parameters to obtain $(\bar{\mathbf{u}}\cdot \bar{\del})\bar{\mathbf{u}}$
-  \item The operator/variable we wish to learn is then $\mathbf{S_u} = (\bar{\mathbf{u}}\cdot \bar{\del})\bar{\mathbf{u}} - \bar{(\mathbf{u}\cdot \del)\mathbf{u}}$. Which is the parameterisation.
+  \item Then they coarse-grained these smoothed fields to a low-resolution to obtain $\overline{(\mathbf{u}\cdot \nabla)\mathbf{u}}$
+  \item Then they run a low-resolution model from the same intial conditions/with the same parameters to obtain $(\bar{\mathbf{u}}\cdot \bar{\nabla})\bar{\mathbf{u}}$
+  \item The operator/variable we wish to learn is then $\mathbf{S_u} = (\bar{\mathbf{u}}\cdot \bar{\nabla})\bar{\mathbf{u}} - \overline{(\mathbf{u}\cdot \nabla)\mathbf{u}}$. Which is the parameterisation.
   \item The input to the model must be the output from the low-resolution climate/fluids model, and the perfect output should be the "ideal" low-res model obtained by smoothing and coarse-graining the high-res model as above.
 \end{itemize}
 
