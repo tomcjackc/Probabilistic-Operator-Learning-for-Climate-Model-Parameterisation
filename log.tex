@@ -211,6 +211,135 @@ This is a tradeoff that would have to be made.
 The opposite idea would also be valid, training lots of lower-dimensional GPs.
 This choice could possibly be made according to the problem at hand?
 
+commit 0dbdad1.
+
+\section{14/05/24}
+
+\subsection{Meeting with Henry}
+
+deep kernel learning
+
+alternative approach: concatenate as new data rather than new features.
+
+apply this new approach to darcy problem - the input and output data look very different.
+
+look at empirical measures of correlation
+
+\subsection{Project work}
+
+Applying the model to the darcy problem, initially without the combined PCA.
+Relative L2 = 4.1\%, visually poor, missing sharp features.
+
+\section{15/05/24}
+
+Wrote master script to allow for the mass production of experiments.
+Including writing the dataloaders for each experiment individually.
+
+Coded up the combined PCA idea that involves concatenating along the n_samples axis, rather than the n_features axis.
+This is an alternative way of combining the PCAs, but it's not clear how it would work on problems where the input and output data are very different in shape.
+
+Applied the current model to the helmholtz problem.
+
+For the helmholtz problem, results using this framework are very different depending on whether the data is standardised before the PCA or not, as expected.
+This is because the x and y data are of very different scales, and the PCA is biased towards the x data as it exists over larger ranges of values.
+
+\section{16/05/24}
+
+completed a derivation of the combined PCA with an expanded feature space.
+it turns out that the framework I coded is equivalent to training a PCA by maximising the sum of the variance of the input data, the variance of the output data, plus two times the covariance between the two.
+it will be interesting to try to adapt this theory to allow us to tune the relative importance of the variance vs covariance components of this objective function, while it still has an analytic solution.
+Potentially looking at fixing one weight vector and then optimising the other, and then alternating.
+Guaranteeing convergance would be interesting.
+Would be good to discuss this more with Henry tomorrow.
+
+\section{17/05/24}
+
+\subsection{Project work}
+
+Henry had a similar idea about the joint optimisation of w_1 and w_2.
+
+\textbf{Reading up about the Rayleigh quotient, which is the quantity that is maximised in the PCA problem.}
+
+\subsection{Ethics seminar 2}
+
+A discussion on the ways in which value judgements can come into research at every stage.
+Examples include the choice of research question, the choice of methodology, the choice of data, the choice of analysis, the choice of interpretation, the choice of dissemination.
+Journals often have inplicit biases in terms of what topics are considered impactful, and what methodologies are considered valid.
+
+An interesting conclusion drawn was that it is impossible to be completely objective when conducting reasearch, as, at the very least, you are requierd to choose eg. a significance level for hypothesis tests that you conduct.
+The best feasible outcome is to ensure transparency and consistency in the choices that you make, and to be open to criticism.
+
+\section{22/05/24}
+
+Had AI4ER showcase yesterday which took up a lot of time in preparation.
+
+\textbf{silly ideas:}
+\begin{itemize}
+  \item toy equation discovery problem, maybe re-discover $F = ma$ using video analysis and then a simple genetic algorithm (/other comparable approaches??)
+  \item use a neural net architecture as a calculator. easy to generate tonnes of training data. can just do pairwise operations, therefore 3 input nodes, one for each number and then one for the operation. would be an interesting test of overfitting etc
+\end{itemize}
+
+\subsection{Meeting with Henry}
+
+\textbf{Discussion of the combined PCA.} 
+Realisation that the combined PCA in feature space is not as well defined analytically as we thought.
+The current implementation does not do the normalisation correctly.
+Currently, the constraint implemented is that the SUM of the norms of two weight vectors is 1, whereas the constraint we want to implement is that the norm of each weight vector \textit{individually} is 1, which is a much stronger constraint.
+This requires some work to fix, as this is not simply a rescaling due to the definition of the variance that we are maximising, it may also change the "direction" selected.
+
+An interesting alternative analytical approach to formalising this joint PCA is to use lagrange multipliers as used in the PDF Henry sent me.
+This seems like a more mechanically robust method to use than the rayleigh quotient.
+Look into solving the equation that we ended up with --- maybe using the matrix cookboook for some ideas.
+
+\textbf{Actions:}
+\begin{itemize}
+  \item Continue with numerical optimisation approach, try to get some solutions for simple problem, before moving onto the toy problems considered so far.
+  \item Look at the Lagrange multiplier approach and try to solve that equation to get the solution into closed form (it's not an eigenvalue equation): something like $X_{1}^{T}X_{1}\underline{w}_{1} = \lambda \underline{w}_{1} - X_{1}^{T}X_{2} \underline{w}_{2}$
+  \item Quickly generate directly comparable results for the 3 different methods of doing PCA: individual, joint along feature direction, joint along data direction.
+
+\end{itemize}
+
+\textbf{operator learning:}
+In order to make this work true operator learning, it should work on data of any resolution within the given domain.
+Our approach acheives this through the PCA, so if we fit a smoother to the PCA components we find at a given resolution, we could use these to inform the PCA components at a different resolution.
+This would achieve proper operator learning, as the PCA would then be capable of generalising to different resolutions, as a function would.
+It would be cool to run some experiments in this direction to see how this works out (darcy problem would be a good testbed for this).
+Read through the mesh-invariance section of the paper and try to figure out what they're claiming and how.
+We may need to extend these arguements when formalising the joint PCA idea.
+
+realisation: covariance can be negative, we should be looking maximisting the absolute value of the covariance.
+
+\subsection{project work}
+
+\textbf{getting the numerical joint PCA working:}
+following the discussion with Henry, it became clear that the normalisation was very important when finding the optimal direction for a given component, due to the definition of variance that we are using (the optimiser might be incentivised to simply make the weight vectors arbitrarily large as this would also act to increase the variance).
+the "proper" way to constrain the problem didn't seem to be working, with the weight vector wandering off the unit circle as it got optimised, so i chose to manually normalise the weight vector within the objective function itself.
+this was successful at constraining the weight vectors correctly, and the solutions were found quickly for the 2-d toy problem considered, with $\rho \geq 0$.
+
+the effect of changing $\rho$ was very slight, even for very large values, implying to me that there is not much flexibility in such a low-dimensional space for the covariance term to be changed significantly.
+the solution for $\rho = 0$ (two independant PCAs) did not seem to be significantly different to the case of the joint PCA, even when the coupling was made large.
+
+I then applied the numerical joint PCA to the toy problems, but the dimensionality proved to be too high for the optimiser to work in a reasonable amount of time. 
+I maintain that it would find a solution in principle, but it's impractical to use the numerical scheme for these more realistic operator learning problems, as high-dimensionality is a necessary property of the problem for it to be amenable to an operator-learning approach.
+
+It was decided that more work on an analytic solution should be done, or at least an algorithmic way of finding optimal weight vectors that can be conducted quickly, and we could perhaps demostrate a guarantee of convergance.
+
+\section{23/05/24}
+
+\subsection{project work}
+
+\textbf{figuring out the problem statement for the climate model problem:}
+Had another look over Zanna 2020.
+My current understanding of the problem they solved is:
+\begin{itemize}
+  \item They ran a climate/fluids model under some intial conditions and at a high resolution.
+  \item They then smoothed the velocity/momentum and temperature fields using a gaussian filter to remove all of the small-scale information.
+  \item Then they coarse-grained these smoothed fields to a low-resolution to obtain $\bar{(\mathbf{u}\cdot \del)\mathbf{u}}$
+  \item Then they run a low-resolution model from the same intial conditions/with the same parameters to obtain $(\bar{\mathbf{u}}\cdot \bar{\del})\bar{\mathbf{u}}$
+  \item The operator/variable we wish to learn is then $\mathbf{S_u} = (\bar{\mathbf{u}}\cdot \bar{\del})\bar{\mathbf{u}} - \bar{(\mathbf{u}\cdot \del)\mathbf{u}}$. Which is the parameterisation.
+  \item The input to the model must be the output from the low-resolution climate/fluids model, and the perfect output should be the "ideal" low-res model obtained by smoothing and coarse-graining the high-res model as above.
+\end{itemize}
+
 
 
 \end{document}

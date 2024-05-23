@@ -163,3 +163,4 @@ cython_debug/
 *.nc
 *.mat
 *.npy
+*.csv
