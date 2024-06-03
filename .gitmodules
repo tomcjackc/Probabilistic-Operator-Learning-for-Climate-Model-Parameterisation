@@ -1,0 +1,3 @@
+[submodule "pyqg_parameterization_benchmarks"]
+	path = pyqg_parameterization_benchmarks
+	url = git@github.com:m2lines/pyqg_parameterization_benchmarks.git

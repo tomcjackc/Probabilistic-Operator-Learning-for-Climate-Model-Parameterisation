@@ -340,6 +340,53 @@ My current understanding of the problem they solved is:
   \item The input to the model must be the output from the low-resolution climate/fluids model, and the perfect output should be the "ideal" low-res model obtained by smoothing and coarse-graining the high-res model as above.
 \end{itemize}
 
+In some of this literature, they use $\hat{S}$ to denote the predicted $S$, whereas I automatically read it as an operator when it has a hat.
+This is not what they mean, even though this is operator learning.
+
+\section{03/06/24}
+
+let the log slip for a week or so.
+
+Reading a paper (Bhattacharya et al 2021) that seems to detail the same model as what we are using, only with a neural network doing the regression in the latent space, therefore not getting any uncertainty quantification.
+They explore the idea of using kernel PCA for dimensionality-reduction --- i'm not sure how this would transfer to the equation-discovery setting (would it still be a closed form solution?).
+
+The Bhattacharya group at caltech does some cool stuff in this space, as well as the Andrew Stuart and Owhadi groups (also caltech). 
+
+\section{project work}
+I ran the model on fluids data I generated myself last week.
+The model performed very poorly, with huge errors, and visually poor determination of the magnitude of values. 
+The size/wavenumber of features seemed to be promising however, so the error could be in the normalisation of the data, even though this does not seem to be a problem in any other models.
+
+Upon inspection of the generated data, some seems to be $\sim$blank for some reason, I need to investigate this, as this could be causing the problem in training.
+
+Is the PV field-to-PV field experiment the best?
+I'm not sure if the problem statement as currently laid-out incentivises the model to learn the features that we care about --- we want to learn accurate statistical properties of the "ideal" field for applications to climate models.
+
+Train and test sizes are now 500 and 500 to speed up interating over models.
+
+Rerunning the model on darcy flow problem (r = 30 ie very coarse resolution), n = m = 20, ARD = False, multiinput = True, standardise = True, combine\_pca = False.
+Not standardising the data before PCA.
+train = 0.03, test = 0.34.
+Poor generalisation.
+
+Rerunning with the same params, but with combine\_pca = features.
+Not standardising the data before PCA.
+train = 0.19, test = 0.26.
+Less overfitting, better result at this resolution.
+Should try with higher dimensionality now.
+
+Increasing the dimensionality to n = m = 40 has no effect on the results, both train and test were the same.
+May increase "resolution" of the inputs to see if the PCA was struggling to pick up good features.
+
+Run with r = 15, n = m = 40, combine\_pca = features.
+No difference.
+
+Run to recreate my previous best result, n = m = 50, combine\_PCA = None, with r = 15.
+Train = 0.016, test = 0.345.
+Something has gone wrong since last using the Darcy data.
+
+
+
 
 
 \end{document}

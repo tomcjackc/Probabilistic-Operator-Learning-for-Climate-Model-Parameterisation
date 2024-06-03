@@ -1,5 +1,9 @@
 import numpy as np
 import scipy
+import re
+import os
+import xarray as xr
+from sklearn.model_selection import train_test_split
 
 def get_navier_stokes_data(n_train, n_test):
     '''
@@ -97,3 +101,55 @@ def get_helmholtz_data(n_train, n_test):
     x_grid, y_grid = None, None
 
     return x_train, y_train, x_test, y_test, x_grid, y_grid
+
+def find_files_matching_regex(directory, regex_pattern):
+    # Compile the regex pattern for better performance
+    pattern = re.compile(regex_pattern)
+    matching_files = []
+
+    # Walk through the directory
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            if pattern.match(file):
+                matching_files.append(os.path.join(root, file))
+    
+    return matching_files
+
+def get_PV_param_data(n_train, n_test, operator, level = 2):
+    '''
+    Assumes total number of datapoints is greater than n_train + n_test.
+    Assumes low res means 64x64 grid size.
+    Assumes high res means 256x256 grid size.
+    Assumes L=1.0e6.
+    Assumes all data in the directory is relevant.
+    Don't change level from 2 as the generated data is currently only for level 2.
+    '''
+
+    # Load low-res data
+    regex = r'^eddy_64_.+years_L=1\.0e6\.nc$'
+    low_res_files = find_files_matching_regex('../2d_data/eddy_config/lowres/', regex)[-(n_train+n_test):]
+
+    # low_res_files = [f'{file}' for file in low_res_files]
+    low_res_data = xr.open_mfdataset(low_res_files)
+    q_low_res = low_res_data.q.sel(lev=level)
+    x = q_low_res.values.reshape(-1, 64 * 64)
+    print('loaded low-res (x) data')
+
+    # Load coarsened data
+    regex = f'^eddy_256_q_operator{operator}_.+years_L=1\.0e6\.csv$'
+    coarsened_files = find_files_matching_regex('../2d_data/eddy_config/coarsened/', regex)[-(n_train+n_test):]
+    y = []
+    for file in coarsened_files:
+        y.append(np.genfromtxt(file, delimiter=','))
+    y = np.array(y)
+    if y.ndim == 4:
+        raise ValueError('y has 4 dimensions, this code needs changing so it selects the correct level, as given by the level arguement.')
+    y = y.reshape(-1, 64 * 64)
+    print('loaded coarsened (y) data')
+
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=n_test, random_state=42)
+
+    x_grid, y_grid = None, None
+
+    return x_train, y_train, x_test, y_test, x_grid, y_grid
+

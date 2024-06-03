@@ -212,7 +212,7 @@ class GP_regressor():
 
 
 class full_model():
-    def __init__(self, n, m, ARD, multiinput, standardise, combine_pca):
+    def __init__(self, n, m, ARD, multiinput, standardise, combine_pca = False):
         # if combining pca, the dimension of the latent space = n
         self.n = n
         self.m = m
