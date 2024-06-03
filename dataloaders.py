@@ -73,7 +73,7 @@ def get_darcy_data(n_train, n_test, r):
     grid = np.vstack([xx.ravel() for xx in np.meshgrid(*grids)]).T
 
     x_test = x_test.reshape(n_test, s * s)
-    y_test = y_train.reshape(n_test, s * s)
+    y_test = y_test.reshape(n_test, s * s)
 
     x_grid, y_grid = grid, grid
     return x_train, y_train, x_test, y_test, x_grid, y_grid
