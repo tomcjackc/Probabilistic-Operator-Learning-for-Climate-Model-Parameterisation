@@ -15,6 +15,7 @@ import multiprocessing as mp
 from functools import partial
 import tensorflow_probability.substrates.jax.bijectors as tfb
 from scipy.optimize import minimize
+import scipy
 
 class first_model():
     def __init__(self, low_dim_x, low_dim_y = 1, low_dim_regressor = 'linear', GP_params = None, multiinput = False):
@@ -212,8 +213,9 @@ class GP_regressor():
 
 
 class full_model():
-    def __init__(self, n, m, ARD, multiinput, standardise, combine_pca = False):
+    def __init__(self, problem, n, m, ARD, multiinput, standardise, combine_pca = False):
         # if combining pca, the dimension of the latent space = n
+        self.problem = problem
         self.n = n
         self.m = m
         self.ARD = ARD
@@ -224,6 +226,8 @@ class full_model():
             self.m = self.n
 
     def fit(self, x_train, y_train, n_samples = None):
+
+        self.s = int(np.sqrt(x_train.shape[1]))
 
         if self.ARD:
             if self.multiinput:
@@ -283,6 +287,8 @@ class full_model():
             print('does x pca')
             self.y_train_pca = self.y_pca.fit_transform(self.y_train)
             print('does y pca')
+            self.x_train_pca_components = self.x_pca.components_
+            self.y_train_pca_components = self.y_pca.components_
 
         self.model_list = []
 
@@ -396,6 +402,71 @@ class full_model():
             return y_pred[:, 0, :], test_samples
         else:
             return y_pred[:, 0, :]
+        
+    def predict_new_res(self, x_test):
+        self.x_test = x_test
+        
+        s_test = int(np.sqrt(x_test.shape[1]))
+
+        extents = {'darcy': [0, 1, 0, 1], 'helm': [0, 1, 0, 1], 'ns': [0, 2*np.pi, 0, 2*np.pi]}
+        extent = extents[self.problem]
+
+        x_old = np.linspace(extent[0], extent[1], self.s)
+        y_old = np.linspace(extent[2], extent[3], self.s)
+
+        xg_old, yg_old = np.meshgrid(x_old, y_old)
+
+        x_new = np.linspace(extent[0], extent[1], s_test)
+        y_new = np.linspace(extent[2], extent[3], s_test)
+
+        xg_new, yg_new = np.meshgrid(x_new, y_new)
+
+        new_x_train_pca_components = np.zeros((self.n, s_test, s_test))
+        new_y_train_pca_components = np.zeros((self.n, s_test, s_test))
+        for i in range(self.n):
+            interp_x = scipy.interpolate.RegularGridInterpolator((x_old, y_old), self.x_train_pca_components[i].reshape(self.s, self.s))
+            for j in range(s_test):
+                for k in range(s_test):
+                    new_x_train_pca_components[i, j, k] = interp_x([x_new[j], y_new[k]])
+
+        for i in range(self.m):
+            interp_y = scipy.interpolate.RegularGridInterpolator((x_old, y_old), self.y_train_pca_components[i].reshape(self.s, self.s))
+            for j in range(s_test):
+                for k in range(s_test):
+                    new_y_train_pca_components[i, j, k] = interp_y([x_new[j], y_new[k]])
+        
+        im0 = plt.imshow(self.x_train_pca_components[0].reshape(self.s, self.s))
+        plt.colorbar(im0)
+        plt.show()
+        im1 = plt.imshow(new_x_train_pca_components[0])
+        plt.colorbar(im1)
+        plt.show()
+
+        new_x_pca = PCA(n_components = self.n)
+        new_y_pca = PCA(n_components = self.m)
+        new_x_pca.components_ = new_x_train_pca_components.reshape(self.n, -1)
+        new_y_pca.components_ = new_y_train_pca_components.reshape(self.m, -1)
+        new_x_pca.mean_ = x_test.mean(axis = 0)
+        arr = [np.mean(self.y_train, axis = 0)[2*i:(2*i)+1] for i in range(int(self.y_train.shape[1]/4))]
+        new_y_pca.mean_ = np.zeros(x_test.shape[1]) # np.array(arr).T
+
+        new_x_test_pca = new_x_pca.transform(x_test)
+        
+        new_y_pred_pca_stand = []
+        new_x_test_pca_stand = (new_x_test_pca - self.x_train_pca.mean(axis = 0)) / self.x_train_pca.std(axis = 0)
+
+        for i in tqdm(range(self.m)):
+            local_gp = self.model_list[i]
+            new_y_pred_pca_stand.append(local_gp.predict(new_x_test_pca_stand, return_bounds = True))
+        
+        new_y_pred_pca_stand = np.stack(new_y_pred_pca_stand).T
+        new_y_pred_pca = (new_y_pred_pca_stand * 4.3 * self.y_train_pca.std(axis = 0)) + self.y_train_pca.mean(axis = 0)
+
+        new_y_pred = new_y_pca.inverse_transform(new_y_pred_pca)
+
+        return new_y_pred[:, 0, :]
+
+        
         
 def my_joint_PCA(X_1, X_2, rho = 0, n_components = 1):
     result_history = []

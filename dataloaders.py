@@ -4,6 +4,8 @@ import re
 import os
 import xarray as xr
 from sklearn.model_selection import train_test_split
+import fsspec
+from tools import *
 
 def get_navier_stokes_data(n_train, n_test):
     '''
@@ -115,41 +117,36 @@ def find_files_matching_regex(directory, regex_pattern):
     
     return matching_files
 
-def get_PV_param_data(n_train, n_test, operator, level = 2):
+def get_PV_param_data(n_train, n_test, config, resolution, filter, time_size = None):
     '''
     Assumes total number of datapoints is greater than n_train + n_test.
-    Assumes low res means 64x64 grid size.
-    Assumes high res means 256x256 grid size.
-    Assumes L=1.0e6.
-    Assumes all data in the directory is relevant.
-    Don't change level from 2 as the generated data is currently only for level 2.
     '''
+    if config != 'eddy' and config != 'jet': raise ValueError('Invalid config')
+    if resolution != 48 and resolution != 64 and resolution != 96: raise ValueError('Invalid resolution')
+    
+    if filter != 'sharp' and filter != 'gauss': raise ValueError('Invalid filter')
 
-    # Load low-res data
-    regex = r'^eddy_64_.+years_L=1\.0e6\.nc$'
-    low_res_files = find_files_matching_regex('../2d_data/eddy_config/lowres/', regex)[-(n_train+n_test):]
 
-    # low_res_files = [f'{file}' for file in low_res_files]
-    low_res_data = xr.open_mfdataset(low_res_files)
-    q_low_res = low_res_data.q.sel(lev=level)
-    x = q_low_res.values.reshape(-1, 64 * 64)
-    print('loaded low-res (x) data')
+    def open_zarr(folder):
+        for url, label in zip(['https://g-402b19.00888.8540.data.globus.org', 'https://storage.googleapis.com/m2lines-public-persistent/perezhogin-generative-zarr'], ['NYU', 'Google Cloud']):
+            try:
+                mapper = fsspec.get_mapper(f'{url}/{folder}.zarr')
+                return xr.open_zarr(mapper, consolidated=True)
+            except:
+                print(f'{folder} on {label} failed')
 
-    # Load coarsened data
-    regex = f'^eddy_256_q_operator{operator}_.+years_L=1\.0e6\.csv$'
-    coarsened_files = find_files_matching_regex('../2d_data/eddy_config/coarsened/', regex)[-(n_train+n_test):]
-    y = []
-    for file in coarsened_files:
-        y.append(np.genfromtxt(file, delimiter=','))
-    y = np.array(y)
-    if y.ndim == 4:
-        raise ValueError('y has 4 dimensions, this code needs changing so it selects the correct level, as given by the level arguement.')
-    y = y.reshape(-1, 64 * 64)
-    print('loaded coarsened (y) data')
+    ds = open_zarr(f'{config}/{resolution}/{filter}')
 
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=n_test, random_state=42)
+    train = ds.isel(run=slice(0,n_train), time=slice(time_size, None)).load()
+    test = ds.isel(run=slice(n_train,n_train+n_test), time=slice(time_size, None)).load()
+    print(train)
+    print(test)
 
-    x_grid, y_grid = None, None
+    x_train, y_train, x_test, y_test, x_scale, y_scale = prepare_PV_data(train, test)
+    print(x_train.shape, y_train.shape, x_test.shape, y_test.shape)
 
-    return x_train, y_train, x_test, y_test, x_grid, y_grid
+    # reshape so data in in the form (n_samples, n_features), where n_features is resolution*resolution*2 becuase we feed both layers of the PV field
+    x_train, y_train, x_test, y_test = x_train.reshape(-1, resolution*resolution*2), y_train.reshape(-1, resolution*resolution*2), x_test.reshape(-1, resolution*resolution*2), y_test.reshape(-1, resolution*resolution*2)
+
+    return x_train, y_train, x_test, y_test, x_scale, y_scale
 

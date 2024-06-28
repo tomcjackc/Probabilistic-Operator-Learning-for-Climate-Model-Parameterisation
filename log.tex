@@ -376,7 +376,7 @@ Less overfitting, better result at this resolution.
 Should try with higher dimensionality now.
 
 Increasing the dimensionality to n = m = 40 has no effect on the results, both train and test were the same.
-May increase "resolution" of the inputs to see if the PCA was struggling to pick up good features.
+May increase 'resolution' of the inputs to see if the PCA was struggling to pick up good features.
 
 Run with r = 15, n = m = 40, combine\_pca = features.
 No difference.
@@ -385,6 +385,49 @@ Run to recreate my previous best result, n = m = 50, combine\_PCA = None, with r
 Train = 0.016, test = 0.345.
 Something has gone wrong since last using the Darcy data.
 
+Fixed the Darcy dataloader, there was a typo in the import of the y test data which caused the model accuracy to be misrepresented.
+
+\section{04/06/24}
+
+\subsection{meeting with Henry}
+
+Went through the problems I was having with the real fluids data.
+
+The main outcome was that we found a repo (https://github.com/Pperezhogin/pyqg_generative/blob/master/pyqg_generative/) that contains relevant data for this problem, nicely split into training and testing.
+I'm going to use this today to test out the model, it looks reasonably simple.
+
+I also got access to JASMIN today so I can use that for longer runs if required.
+
+\subsection{project work}
+
+Managed to download the data from the globus repository, now I want to run my model on it and see how it performs.
+
+I've got the data into the correct formatting using the code from the paper/repo.
+It comes normalised so I hope that works okay with the model, other efforts to standardise have reduced performance so far.
+
+fitted the model with n = m = 10 as a test, with ARD = False, multiinput = True, standardise = True, combine_pca = None and n_train = 10, n_test = 7.
+Mean relative L2 was huge ($\sim$300), but the median was around 1.
+On some test points (presumably the very early instances of the simulation where ground-truth target values are very small), the error was on the order of thousands, these were skewing the mean L2 score.
+I could try again on data that does not originate from the start of simulations in order to avoid this problem.
+This would involve slicing the data in the dataloader and wouldn't be too much work.
+Alternatively, I could just increase the dimensionality and see how this affects the results, it might be significant.
+
+In general (and for all the toy problems as well), it would be good to have plots that indicate how the test performance varies with a. the number of training examples, and b. the dimensionality of the latent space.
+
+Now running the model again with n = m = 45, as the attempt with n = m = 20 was a slight improvement.
+I think I might have to do something cleverer though, such as the time cutoff.
+
+Running with n = m = 45 had very little effect, with the relative L2 just below 1 and the R2 above 0 on train, but the opposite being true on test.
+In other words it doesn't seem to be learning very much at all.
+
+\section{06/06/24}
+ Lost all of yesterday due to dentist appt and transport issues.
+
+ \subsection{Project work}
+
+\section{13/06/24}
+
+The Lu group at Yale do cool AI4Science stuff --- Lu is the author on the DeepONet paper.
 
 
 
