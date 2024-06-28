@@ -1,4 +1,4 @@
-# Notebooks required to reproduce results
+# Notebooks required to reproduce results
 
 The notebooks in this directory are used to reproduce the results presented in Chapter 4. Archived notebooks are either redundant or experimental and are not required for the results presented, but are available for interested readers (they will have to be moved to the `notebooks/` directory to run).
 
