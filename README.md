@@ -1,6 +1,6 @@
 # Probabilistic Operator Learning for Climate Model Parameterisation
 
-This repository contains the code required to reproduce the results presented in the MRes Thesis "Probabilistic Operator Learning for Climate Model Parameterisation", submitted at The University of Cambridge.
+This repository contains the code required to reproduce the results presented in the MRes Thesis "Probabilistic Operator Learning for Climate Model Parameterisation", submitted to The University of Cambridge.
 
 # Setup
 
