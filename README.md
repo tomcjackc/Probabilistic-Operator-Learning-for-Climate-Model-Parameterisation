@@ -22,8 +22,10 @@ Data for the benchmark problems --- Burgers', Darcy Flow, Helmholtz, Navier-Stok
 
 The Jupyter notebooks found in the `notebooks/` directory can be used to reproduce the results presented in the thesis. See `notebooks/README.md` for more details.
 
-Model architectures for our operator learning framework are found in `models.py`, including a base class for our overall model and a gaussian process regressor class used for our latent representation of the operator in question.
+Model architectures for our operator learning framework are found in `models.py`, including a base class for our overall model and a gaussian process regressor class (written using GPJax) used for our latent representation of the operator in question.
 
 Code used to load data for each benchmark problem and the PV parameterisation experiment is found in `dataloaders.py`. This ensures that data used in the notebooks is in a standardised format.
 
 Lastly, `tools.py` includes some helper functions required to load data for the PV parameterisation experiment. This code is reused from https://github.com/m2lines/pyqg_generative.git.
+
+The submodule `pyqg_parameterisation_benchmarks` is used to generate new data for PV parameterisation in experiments, but is not used in the final results of this work.
