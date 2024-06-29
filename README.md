@@ -7,10 +7,11 @@ This repository contains the code required to reproduce the results presented in
 We recommend first cloning this repository locally. Navigate to your chosen directory and use
 
     git clone https://github.com/tomcjackc/Probabilistic-Operator-Learning-for-Climate-Model-Parameterisation.git
+    cd Probabilistic-Operator-Learning-for-Climate-Model-Parameterisation
 
-The `conda` environment used to conduct this work can be created by navigating using
+The `conda` environment used to conduct this work can be created by using
 
-    conda create --name <env-name> --file requirements.txt
+    conda env create -f environment.yml
 
 Notebooks in the `notebooks/` diectory should now be runnable. If the `import` statements raise exceptions, please contact [tc656@cam.ac.uk](mailto:tc656@cam.ac.uk) and we'll be happy to help.
 
