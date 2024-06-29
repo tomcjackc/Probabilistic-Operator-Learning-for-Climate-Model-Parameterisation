@@ -297,4 +297,4 @@ dependencies:
     - widgetsnbextension==4.0.10
     - wrapt==1.16.0
     - zarr==2.18.2
-prefix: /Users/tomcowperthwaite/opt/anaconda3/envs/prob_operator_learning_parameterisation
+prefix: /Users/tomcowperthwaite/opt/anaconda3/envs/prob_operator_learning_parameterisation # REMEMBER: replace this with the filepath to your conda environments!
